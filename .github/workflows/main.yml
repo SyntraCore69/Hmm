@@ -1,0 +1,40 @@
+name: Build Laava Chat APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.3.10'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Laava Chat APK
+        run: flutter build apk --release
+
+      - name: Upload Laava Chat APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Laava-Chat-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
