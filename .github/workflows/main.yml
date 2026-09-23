@@ -1,0 +1,98 @@
+name: Build Laava Chat APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.0.5'
+          channel: stable
+          cache: true
+
+      - name: Show versions
+        run: |
+          flutter --version
+          dart --version
+          java -version
+
+      - name: Clean Flutter project
+        run: flutter clean
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Fix legacy cached_video_player
+        shell: bash
+        run: |
+          PLAYER_DIR="$HOME/.pub-cache/hosted/pub.dartlang.org/cached_video_player-2.0.3"
+
+          if [ ! -d "$PLAYER_DIR" ]; then
+            echo "cached_video_player 2.0.3 was not found."
+            exit 1
+          fi
+
+          GRADLE_FILE="$PLAYER_DIR/android/build.gradle"
+          JAVA_FILE="$PLAYER_DIR/android/src/main/java/com/lazyarts/vikram/cached_video_player/CacheDataSourceFactory.java"
+
+          echo "Patching ExoPlayer version..."
+          sed -i 's/2\.12\.1/2.13.3/g' "$GRADLE_FILE"
+
+          echo "Disabling deprecation warnings for this legacy plugin..."
+          if ! grep -q "Xlint:-deprecation" "$GRADLE_FILE"; then
+            cat >> "$GRADLE_FILE" <<'EOF'
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.remove('-Werror')
+    options.compilerArgs.add('-Xlint:-deprecation')
+}
+EOF
+          fi
+
+          echo "Checking patched Gradle configuration:"
+          tail -20 "$GRADLE_FILE"
+
+          echo "Checking ExoPlayer versions:"
+          grep -n "exoplayer" "$GRADLE_FILE"
+
+          echo "Checking cached_video_player source:"
+          test -f "$JAVA_FILE"
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Verify APK
+        run: |
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "APK was not generated."
+            exit 1
+          fi
+
+          ls -lh "$APK"
+
+      - name: Upload Laava Chat APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Laava-Chat-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
