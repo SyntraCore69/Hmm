@@ -16,11 +16,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '11'
-          cache: gradle
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -29,16 +28,28 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Show Flutter version
+      - name: Show versions
         run: |
           flutter --version
           dart --version
+          java -version
 
       - name: Clean Flutter project
         run: flutter clean
 
       - name: Get Flutter dependencies
         run: flutter pub get
+
+      - name: Fix legacy ExoPlayer dependency for CI
+        run: |
+          find "$HOME/.pub-cache" \
+            -path "*/cached_video_player-2.0.3/android/build.gradle" \
+            -exec sed -i 's/2\.12\.1/2.13.3/g' {} \;
+
+          echo "Checking cached_video_player Gradle file:"
+          find "$HOME/.pub-cache" \
+            -path "*/cached_video_player-2.0.3/android/build.gradle" \
+            -exec grep -n "exoplayer" {} \;
 
       - name: Build release APK
         run: flutter build apk --release
